@@ -193,7 +193,12 @@ fun ModrinthScreen(viewModel: AppViewModel) {
             ) {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    // Фон обязателен: он попадает в записываемый слой, и размытая
+                    // копия становится непрозрачной. Иначе сквозь неё виден
+                    // чёткий текст списка и получается «каша».
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
                     contentPadding = PaddingValues(
                         start = 20.dp,
                         end = 20.dp,
@@ -301,18 +306,25 @@ private fun HeaderBlock(
         modifier = Modifier
             .fillMaxWidth()
             .onSizeChanged { onHeightChanged(it.height) }
-            // Шапка — «матовое стекло»: размытие не должно вылезать за её края,
-            // иначе под вкладками появляется отдельная размытая полоса.
+            // Шапка заканчивается ровно на разделителе под вкладками.
             .clipToBounds()
     ) {
-        // 1. Размытая копия списка. Рисуется ровно в габаритах шапки, поэтому
-        //    карточки, уехавшие под неё, видны только внутри шапки и только
-        //    размытыми — собственного градиента-перехода снизу больше нет.
+        // 1. Непрозрачная база. Она перекрывает чёткий список, поэтому сквозь
+        //    шапку виден только размытый контур, а не читаемый текст.
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.surface)
+        )
+
+        // 2. Размытая копия списка. Слой теперь непрозрачный (у списка есть
+        //    фон), поэтому карточки не «просвечивают» текстом, а превращаются
+        //    в мягкие пятна. Радиус крупный — детали не разобрать.
         if (blurBackdrop) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .blur(20.dp)
+                    .blur(32.dp)
             ) {
                 Spacer(
                     Modifier
@@ -322,23 +334,22 @@ private fun HeaderBlock(
             }
         }
 
-        // 2. Матовая подложка поверх размытия. Полупрозрачная, но граница
-        //    шапки резкая — список чёткий вплоть до вкладок и размывается
-        //    уже внутри шапки.
+        // 3. Матовый скрим поверх размытия: гасит контраст пятен, чтобы
+        //    поиск и вкладки читались без визуального шума.
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
         )
 
-        // 3. Содержимое шапки: отступаем от статус-бара, но фон и размытие
+        // 4. Содержимое шапки: отступаем от статус-бара, но фон и размытие
         //    начинаются от самого верхнего края экрана.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = 20.dp)
-                .padding(top = 10.dp, bottom = 12.dp)
+                .padding(top = 10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -356,7 +367,7 @@ private fun HeaderBlock(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "v1.1.3",
+                    text = "v1.1.4",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

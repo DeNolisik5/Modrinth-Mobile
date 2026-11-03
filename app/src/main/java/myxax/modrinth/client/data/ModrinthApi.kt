@@ -23,7 +23,7 @@ object ModrinthApi {
     private const val BASE = "https://api.modrinth.com"
 
     private const val USER_AGENT =
-        "ModrinthClient/1.1.3 (github.com/DeNolisik5/Modrinth-Api-Mobile)"
+        "ModrinthClient/1.1.4 (github.com/DeNolisik5/Modrinth-Api-Mobile)"
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
