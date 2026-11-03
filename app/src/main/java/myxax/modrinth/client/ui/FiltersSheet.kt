@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -73,13 +75,20 @@ fun FiltersSheet(
 
             Spacer(Modifier.height(20.dp))
             SectionTitle("Версия Minecraft")
-            ChipFlow {
-                FilterChip(
-                    selected = gameVersion == null,
-                    onClick = { gameVersion = null },
-                    label = { Text("Любая") }
-                )
-                versions.take(60).forEach { version ->
+            // Версий много, поэтому лента горизонтальная: шторка не растягивается
+            // на пол-экрана, а нужная версия листается вбок.
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item(key = "any") {
+                    FilterChip(
+                        selected = gameVersion == null,
+                        onClick = { gameVersion = null },
+                        label = { Text("Любая") }
+                    )
+                }
+                items(versions, key = { it }) { version ->
                     FilterChip(
                         selected = gameVersion == version,
                         onClick = {

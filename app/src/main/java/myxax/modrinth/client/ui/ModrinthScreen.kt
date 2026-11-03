@@ -359,7 +359,7 @@ private fun HeaderBlock(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "v1.1.5",
+                    text = "v1.1.6",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
