@@ -4,9 +4,7 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -127,7 +125,6 @@ private val ExpressiveTypography = Typography(
     )
 )
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ModrinthTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -144,9 +141,8 @@ fun ModrinthTheme(
         else -> LightColors
     }
 
-    MaterialExpressiveTheme(
+    MaterialTheme(
         colorScheme = colorScheme,
-        motionScheme = MotionScheme.expressive(),
         shapes = ExpressiveShapes,
         typography = ExpressiveTypography,
         content = content
