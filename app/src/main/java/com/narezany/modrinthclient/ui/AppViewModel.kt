@@ -44,7 +44,7 @@ class AppViewModel : ViewModel() {
     private var searchJob: Job? = null
 
     init {
-        runSearch()
+        viewModelScope.launch { runSearch() }
     }
 
     // ------------------------------------------------------------ поиск
