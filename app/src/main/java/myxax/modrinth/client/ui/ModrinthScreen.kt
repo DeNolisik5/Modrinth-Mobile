@@ -21,6 +21,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -63,6 +68,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -149,6 +155,7 @@ fun ModrinthScreen(viewModel: AppViewModel) {
     var headerHeightPx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
     val headerHeight = with(density) { headerHeightPx.toDp() }
+    val navigationBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     // Подгружаем следующую страницу, когда до конца списка осталось 3 элемента.
     val shouldLoadMore by remember {
@@ -165,7 +172,9 @@ fun ModrinthScreen(viewModel: AppViewModel) {
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        // Шапка сама тянется под статус-бар, поэтому отступы Scaffold не нужны.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -189,7 +198,7 @@ fun ModrinthScreen(viewModel: AppViewModel) {
                         start = 20.dp,
                         end = 20.dp,
                         top = headerHeight + 12.dp,
-                        bottom = 28.dp
+                        bottom = 28.dp + navigationBarBottom
                     ),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -308,23 +317,30 @@ private fun HeaderBlock(
             }
         }
 
-        // 2. Полупрозрачная «замороженная» подложка.
+        // 2. Непрозрачная подложка с мягким градиентом у нижней кромки:
+        //    элементы управления читаются чётко, а размытый список аккуратно
+        //    проявляется у самого края, без «грязного» двойного наложения.
+        val headerSurface = MaterialTheme.colorScheme.surface
         Box(
             modifier = Modifier
                 .matchParentSize()
                 .background(
-                    MaterialTheme.colorScheme.background.copy(
-                        alpha = if (blurBackdrop) 0.74f else 0.98f
+                    Brush.verticalGradient(
+                        0.0f to headerSurface,
+                        0.88f to headerSurface,
+                        1.0f to headerSurface.copy(alpha = 0f)
                     )
                 )
         )
 
-        // 3. Содержимое шапки.
+        // 3. Содержимое шапки: отступаем от статус-бара, но фон и размытие
+        //    начинаются от самого верхнего края экрана.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = 20.dp)
-                .padding(top = 10.dp, bottom = 4.dp)
+                .padding(top = 10.dp, bottom = 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -342,7 +358,7 @@ private fun HeaderBlock(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "client 1.1",
+                    text = "v1.1.1",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
@@ -41,7 +40,7 @@ fun WavyLinearProgressIndicator(
     trackColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
     strokeWidth: Dp = 6.dp,
     amplitude: Dp = 3.dp,
-    wavelength: Dp = 22.dp
+    wavelength: Dp = 52.dp
 ) {
     val target = progress().coerceIn(0f, 1f)
 
@@ -84,26 +83,33 @@ fun WavyLinearProgressIndicator(
         val filled = size.width * animated
         if (filled <= stroke) return@Canvas
 
+        /*
+         * Важно: путь строится сразу до нужной длины и рисуется БЕЗ clipRect.
+         * Обрезка прямоугольником давала прямой вертикальный срез на конце
+         * полосы — теперь конец пути закругляется сам, за счёт StrokeCap.Round.
+         */
         val path = Path()
         path.moveTo(0f, centerY)
 
         var x = 0f
-        while (x <= filled) {
+        while (x < filled) {
             val angle = (x / waveLength + phase) * tau
             path.lineTo(x, centerY + sin(angle) * swing)
             x += 2f
         }
 
-        clipRect(right = filled) {
-            drawPath(
-                path = path,
-                color = color,
-                style = Stroke(
-                    width = stroke,
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round
-                )
+        // Точная точка окончания, чтобы волна не «перескакивала» прогресс.
+        val endAngle = (filled / waveLength + phase) * tau
+        path.lineTo(filled, centerY + sin(endAngle) * swing)
+
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(
+                width = stroke,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
             )
-        }
+        )
     }
 }

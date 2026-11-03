@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 object ModDownloader {
 
     private const val USER_AGENT =
-        "ModrinthClient/1.1.0 (github.com/DeNolisik5/Modrinth-Api-Mobile)"
+        "ModrinthClient/1.1.1 (github.com/DeNolisik5/Modrinth-Api-Mobile)"
 
     private const val MIME_JAR = "application/java-archive"
     private const val SUBFOLDER = "ModrinthClient"
