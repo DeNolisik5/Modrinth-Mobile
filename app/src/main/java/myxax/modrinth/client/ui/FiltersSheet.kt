@@ -4,16 +4,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -39,6 +41,11 @@ import myxax.modrinth.client.data.SortOption
  *
  * Правки копятся локально и применяются только по кнопке «Применить» —
  * иначе каждый тап по чипу перезапускал бы поиск.
+ *
+ * Шторка сразу открывается на всю высоту, содержимое прокручивается внутри
+ * `LazyColumn`, а кнопки закреплены снизу. Так нет конкуренции между
+ * прокруткой списка и жестом раскрытия шторки — раньше из-за неё шторка
+ * «прыгала».
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,94 +66,115 @@ fun FiltersSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp)
-        ) {
-            Text(
-                text = "Фильтры",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Spacer(Modifier.height(20.dp))
-            SectionTitle("Версия Minecraft")
-            // Версий много, поэтому лента горизонтальная: шторка не растягивается
-            // на пол-экрана, а нужная версия листается вбок.
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Column(modifier = Modifier.fillMaxHeight()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    bottom = 16.dp
+                )
             ) {
-                item(key = "any") {
-                    FilterChip(
-                        selected = gameVersion == null,
-                        onClick = { gameVersion = null },
-                        label = { Text("Любая") }
+                item(key = "title") {
+                    Text(
+                        text = "Фильтры",
+                        style = MaterialTheme.typography.headlineMedium
                     )
+                    Spacer(Modifier.height(20.dp))
                 }
-                items(versions, key = { it }) { version ->
-                    FilterChip(
-                        selected = gameVersion == version,
-                        onClick = {
-                            gameVersion = if (gameVersion == version) null else version
-                        },
-                        label = { Text(version) }
-                    )
+
+                item(key = "versions") {
+                    SectionTitle("Версия Minecraft")
+                    // Версий много, поэтому лента горизонтальная: шторка не
+                    // растягивается на пол-экрана, версия листается вбок.
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item(key = "any") {
+                            FilterChip(
+                                selected = gameVersion == null,
+                                onClick = { gameVersion = null },
+                                label = { Text("Любая") }
+                            )
+                        }
+                        items(versions, key = { it }) { version ->
+                            FilterChip(
+                                selected = gameVersion == version,
+                                onClick = {
+                                    gameVersion = if (gameVersion == version) null else version
+                                },
+                                label = { Text(version) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                }
+
+                item(key = "loaders") {
+                    SectionTitle("Загрузчик")
+                    ChipFlow {
+                        ModLoader.entries.forEach { loader ->
+                            FilterChip(
+                                selected = loader in loaders,
+                                onClick = {
+                                    loaders = if (loader in loaders) {
+                                        loaders - loader
+                                    } else {
+                                        loaders + loader
+                                    }
+                                },
+                                label = { Text(loader.label) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                }
+
+                item(key = "categories") {
+                    SectionTitle("Категории")
+                    ChipFlow {
+                        ModCategory.entries.forEach { category ->
+                            FilterChip(
+                                selected = category in categories,
+                                onClick = {
+                                    categories = if (category in categories) {
+                                        categories - category
+                                    } else {
+                                        categories + category
+                                    }
+                                },
+                                label = { Text(category.label) }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                }
+
+                item(key = "sort") {
+                    SectionTitle("Сортировка")
+                    ChipFlow {
+                        SortOption.entries.forEach { option ->
+                            FilterChip(
+                                selected = sort == option,
+                                onClick = { sort = option },
+                                label = { Text(option.label) }
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-            SectionTitle("Загрузчик")
-            ChipFlow {
-                ModLoader.entries.forEach { loader ->
-                    FilterChip(
-                        selected = loader in loaders,
-                        onClick = {
-                            loaders = if (loader in loaders) loaders - loader else loaders + loader
-                        },
-                        label = { Text(loader.label) }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-            SectionTitle("Категории")
-            ChipFlow {
-                ModCategory.entries.forEach { category ->
-                    FilterChip(
-                        selected = category in categories,
-                        onClick = {
-                            categories = if (category in categories) {
-                                categories - category
-                            } else {
-                                categories + category
-                            }
-                        },
-                        label = { Text(category.label) }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-            SectionTitle("Сортировка")
-            ChipFlow {
-                SortOption.entries.forEach { option ->
-                    FilterChip(
-                        selected = sort == option,
-                        onClick = { sort = option },
-                        label = { Text(option.label) }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(28.dp))
-
+            // Кнопки всегда на виду — не уезжают вместе с прокруткой.
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
