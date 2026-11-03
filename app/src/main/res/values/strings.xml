@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Modrinth Client</string>
+    <string name="search_hint">Найти мод…</string>
+    <string name="download">Скачать</string>
+    <string name="versions">Версии</string>
+    <string name="downloads_label">Скачиваний</string>
+    <string name="follows_label">Подписок</string>
+    <string name="saved_to">Сохранено: %1$s</string>
+    <string name="open_versions">Показать версии</string>
+    <string name="empty_title">Ничего не нашлось</string>
+    <string name="empty_subtitle">Попробуй другой запрос или сними фильтр версии</string>
+    <string name="retry">Повторить</string>
+</resources>
