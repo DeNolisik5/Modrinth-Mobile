@@ -1,4 +1,4 @@
-package com.narezany.modrinthclient.ui
+package myxax.modrinth.client.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -31,43 +33,66 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.narezany.modrinthclient.R
-import com.narezany.modrinthclient.data.ModHit
-import com.narezany.modrinthclient.data.ModVersion
+import myxax.modrinth.client.R
+import myxax.modrinth.client.data.ContentType
+import myxax.modrinth.client.data.ModHit
+import myxax.modrinth.client.data.ModVersion
 import java.util.Locale
 
+/**
+ * Главный экран.
+ *
+ * Размытие сделано на захвате графического слоя: прокручиваемый список
+ * записывается в [GraphicsLayer], а шапка перерисовывает его уменьшенной
+ * копией и размывает через `Modifier.blur` (на Android 12+ это RenderEffect,
+ * то есть рендер целиком на GPU, без нагрузки на CPU).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModrinthScreen(viewModel: AppViewModel) {
@@ -106,40 +131,137 @@ fun ModrinthScreen(viewModel: AppViewModel) {
         viewModel.consumeMessage()
     }
 
+    val listState = rememberLazyListState()
+    val capturedLayer = rememberGraphicsLayer()
+
+    val scrolled by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+        }
+    }
+
+    val sheetOpen = state.filtersOpen || state.selected != null
+    val contentBlur by animateDpAsState(
+        targetValue = if (sheetOpen) 16.dp else 0.dp,
+        label = "contentBlur"
+    )
+
+    var headerHeightPx by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val headerHeight = with(density) { headerHeightPx.toDp() }
+
+    // Подгружаем следующую страницу, когда до конца списка осталось 3 элемента.
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - 3
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore) viewModel.loadMore()
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                // Лёгкое размытие всего фона, пока открыта любая шторка.
+                .blur(contentBlur)
         ) {
-            Header()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        capturedLayer.record { this@drawWithContent.drawContent() }
+                        drawLayer(capturedLayer)
+                    }
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 20.dp,
+                        end = 20.dp,
+                        top = headerHeight + 12.dp,
+                        bottom = 28.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    item(key = "game-versions") {
+                        GameVersionChips(
+                            selected = state.gameVersion,
+                            onSelect = viewModel::setGameVersion
+                        )
+                    }
 
-            SearchField(
-                query = state.query,
-                onQueryChange = viewModel::updateQuery,
-                modifier = Modifier.padding(horizontal = 20.dp)
-            )
+                    when {
+                        state.isLoading && state.results.isEmpty() -> item(key = "loading") {
+                            CenteredBlock { CircularProgressIndicator() }
+                        }
 
-            Spacer(Modifier.height(12.dp))
+                        state.error != null && state.results.isEmpty() -> item(key = "error") {
+                            CenteredBlock {
+                                MessageBlock(
+                                    title = "Ошибка сети",
+                                    subtitle = state.error,
+                                    actionLabel = "Повторить",
+                                    onAction = viewModel::retry
+                                )
+                            }
+                        }
 
-            VersionChips(
-                selected = state.gameVersion,
-                onSelect = viewModel::setGameVersion
-            )
+                        state.results.isEmpty() && !state.isLoading -> item(key = "empty") {
+                            CenteredBlock {
+                                MessageBlock(
+                                    title = "Ничего не нашлось",
+                                    subtitle = "Попробуй другой запрос или измени фильтры",
+                                    actionLabel = null,
+                                    onAction = null
+                                )
+                            }
+                        }
 
-            Spacer(Modifier.height(4.dp))
+                        else -> {
+                            itemsIndexed(state.results) { _, mod ->
+                                ModCard(mod = mod, onClick = { viewModel.openMod(mod) })
+                            }
 
-            Box(Modifier.weight(1f)) {
-                Results(
-                    state = state,
-                    onOpen = viewModel::openMod,
-                    onRetry = viewModel::retry
-                )
+                            item(key = "footer") {
+                                ListFooter(
+                                    isLoadingMore = state.isLoadingMore,
+                                    endReached = state.endReached,
+                                    count = state.results.size
+                                )
+                            }
+                        }
+                    }
+                }
             }
+
+            HeaderBlock(
+                state = state,
+                capturedLayer = capturedLayer,
+                blurBackdrop = scrolled && !sheetOpen,
+                onQueryChange = viewModel::updateQuery,
+                onSelectTab = viewModel::selectTab,
+                onOpenFilters = viewModel::openFilters,
+                onHeightChanged = { headerHeightPx = it }
+            )
         }
+    }
+
+    if (state.filtersOpen) {
+        FiltersSheet(
+            current = state.filters,
+            onDismiss = viewModel::closeFilters,
+            onApply = viewModel::applyFilters
+        )
     }
 
     val selected = state.selected
@@ -155,80 +277,156 @@ fun ModrinthScreen(viewModel: AppViewModel) {
 
 // ------------------------------------------------------------------ шапка
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Header() {
-    Column(
+private fun HeaderBlock(
+    state: ModrinthUiState,
+    capturedLayer: GraphicsLayer,
+    blurBackdrop: Boolean,
+    onQueryChange: (String) -> Unit,
+    onSelectTab: (ContentType) -> Unit,
+    onOpenFilters: () -> Unit,
+    onHeightChanged: (Int) -> Unit
+) {
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .onSizeChanged { onHeightChanged(it.height) }
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = "Modrinth",
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(Modifier.width(8.dp))
+        // 1. Размытая копия списка под шапкой.
+        if (blurBackdrop) {
             Box(
                 modifier = Modifier
-                    .padding(bottom = 8.dp)
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(ModrinthGreen)
-            )
+                    .matchParentSize()
+                    .blur(20.dp)
+            ) {
+                Spacer(
+                    Modifier
+                        .matchParentSize()
+                        .drawBehind { drawLayer(capturedLayer) }
+                )
+            }
         }
-        Text(
-            text = "Моды для Minecraft",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+
+        // 2. Полупрозрачная «замороженная» подложка.
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    MaterialTheme.colorScheme.background.copy(
+                        alpha = if (blurBackdrop) 0.74f else 0.98f
+                    )
+                )
         )
-    }
-}
 
-// ------------------------------------------------------------------ поиск
+        // 3. Содержимое шапки.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(top = 10.dp, bottom = 4.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Modrinth",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(ModrinthGreen)
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = "client 1.1",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
-@Composable
-private fun SearchField(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = modifier.fillMaxWidth(),
-        placeholder = { Text("Найти мод…") },
-        leadingIcon = {
-            Icon(
-                painter = painterResource(R.drawable.ic_search),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
+            Spacer(Modifier.height(10.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = state.query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Найти мод…") },
+                    leadingIcon = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_search),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    trailingIcon = {
+                        if (state.query.isNotEmpty()) {
+                            IconButton(onClick = { onQueryChange("") }) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_close),
+                                    contentDescription = "Очистить"
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(28.dp)
+                )
+
+                Spacer(Modifier.width(10.dp))
+
+                FilledTonalIconButton(onClick = onOpenFilters) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_close),
-                        contentDescription = "Очистить"
+                        painter = painterResource(R.drawable.ic_filter),
+                        contentDescription = "Фильтры",
+                        tint = if (state.filters.isActive) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            LocalContentColor.current
+                        }
                     )
                 }
             }
-        },
-        singleLine = true,
-        shape = RoundedCornerShape(28.dp)
-    )
+
+            Spacer(Modifier.height(8.dp))
+
+            PrimaryTabRow(
+                selectedTabIndex = ContentType.entries.indexOf(state.tab),
+                containerColor = Color.Transparent
+            ) {
+                ContentType.entries.forEach { type ->
+                    val isSelected = state.tab == type
+                    Tab(
+                        selected = isSelected,
+                        onClick = { onSelectTab(type) },
+                        text = {
+                            Text(
+                                text = type.label,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = if (isSelected) {
+                                    FontWeight.Bold
+                                } else {
+                                    FontWeight.Normal
+                                }
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
-private fun VersionChips(
+private fun GameVersionChips(
     selected: String?,
     onSelect: (String?) -> Unit
 ) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             FilterChip(
                 selected = selected == null,
@@ -249,57 +447,38 @@ private fun VersionChips(
 // ---------------------------------------------------------------- список
 
 @Composable
-private fun Results(
-    state: ModrinthUiState,
-    onOpen: (ModHit) -> Unit,
-    onRetry: () -> Unit
-) {
-    when {
-        state.isLoading && state.results.isEmpty() -> CenterBox {
-            CircularProgressIndicator()
-        }
-
-        state.error != null && state.results.isEmpty() -> CenterBox {
-            MessageBlock(
-                title = "Ошибка сети",
-                subtitle = state.error,
-                actionLabel = "Повторить",
-                onAction = onRetry
-            )
-        }
-
-        state.results.isEmpty() -> CenterBox {
-            MessageBlock(
-                title = "Ничего не нашлось",
-                subtitle = "Попробуй другой запрос или сними фильтр версии",
-                actionLabel = null,
-                onAction = null
-            )
-        }
-
-        else -> LazyColumn(
-            contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
-                top = 8.dp,
-                bottom = 24.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            itemsIndexed(state.results) { _, mod ->
-                ModCard(mod = mod, onClick = { onOpen(mod) })
-            }
-        }
+private fun CenteredBlock(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 64.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
     }
 }
 
 @Composable
-private fun CenterBox(content: @Composable () -> Unit) {
+private fun ListFooter(
+    isLoadingMore: Boolean,
+    endReached: Boolean,
+    count: Int
+) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 18.dp),
         contentAlignment = Alignment.Center
     ) {
-        content()
+        when {
+            isLoadingMore -> CircularProgressIndicator(modifier = Modifier.size(26.dp))
+            endReached && count > 0 -> Text(
+                text = "Это все результаты",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            else -> Unit
+        }
     }
 }
 
@@ -310,10 +489,7 @@ private fun MessageBlock(
     actionLabel: String?,
     onAction: (() -> Unit)?
 ) {
-    Column(
-        modifier = Modifier.padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = title, style = MaterialTheme.typography.titleLarge)
         if (subtitle != null) {
             Spacer(Modifier.height(6.dp))
@@ -451,7 +627,7 @@ private fun ModDetailsSheet(
 
                 state.versions.isEmpty() -> item {
                     Text(
-                        text = "У этого мода пока нет опубликованных версий.",
+                        text = "У этого проекта пока нет опубликованных версий.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -500,10 +676,7 @@ private fun SheetHeader(mod: ModHit) {
 
     Spacer(Modifier.height(14.dp))
 
-    Text(
-        text = mod.description,
-        style = MaterialTheme.typography.bodyMedium
-    )
+    Text(text = mod.description, style = MaterialTheme.typography.bodyMedium)
 
     Spacer(Modifier.height(16.dp))
 
@@ -582,11 +755,9 @@ private fun VersionRow(
 
             if (download is DownloadState.Running) {
                 Spacer(Modifier.height(10.dp))
-                LinearProgressIndicator(
+                WavyLinearProgressIndicator(
                     progress = { download.progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 

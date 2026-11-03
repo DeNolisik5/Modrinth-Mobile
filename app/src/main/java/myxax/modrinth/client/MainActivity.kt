@@ -1,4 +1,4 @@
-package com.narezany.modrinthclient
+package myxax.modrinth.client
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,9 +9,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.narezany.modrinthclient.ui.AppViewModel
-import com.narezany.modrinthclient.ui.ModrinthScreen
-import com.narezany.modrinthclient.ui.ModrinthTheme
+import myxax.modrinth.client.ui.AppViewModel
+import myxax.modrinth.client.ui.ModrinthScreen
+import myxax.modrinth.client.ui.ModrinthTheme
 
 class MainActivity : ComponentActivity() {
 

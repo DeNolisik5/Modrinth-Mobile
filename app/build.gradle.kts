@@ -7,15 +7,15 @@ plugins {
 }
 
 android {
-    namespace = "com.narezany.modrinthclient"
+    namespace = "myxax.modrinth.client"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.narezany.modrinthclient"
+        applicationId = "myxax.modrinth.client"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     buildTypes {

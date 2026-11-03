@@ -1,4 +1,4 @@
-package com.narezany.modrinthclient.ui
+package myxax.modrinth.client.ui
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
