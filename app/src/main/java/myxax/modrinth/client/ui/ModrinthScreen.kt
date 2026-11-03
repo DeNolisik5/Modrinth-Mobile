@@ -92,6 +92,15 @@ import myxax.modrinth.client.data.ModVersion
 import java.util.Locale
 
 /**
+ * Высота зоны перехода в прозрачность под вкладками.
+ *
+ * Она же служит нижним отступом шапки, поэтому градиент всегда начинается
+ * ровно на линии под вкладками (`PrimaryTabRow` рисует там разделитель),
+ * а не где-то ниже, как при расчёте «в процентах от высоты».
+ */
+private val HeaderFade = 28.dp
+
+/**
  * Главный экран.
  *
  * Размытие сделано на захвате графического слоя: прокручиваемый список
@@ -317,20 +326,27 @@ private fun HeaderBlock(
             }
         }
 
-        // 2. Непрозрачная подложка с мягким градиентом у нижней кромки:
-        //    элементы управления читаются чётко, а размытый список аккуратно
-        //    проявляется у самого края, без «грязного» двойного наложения.
+        // 2. Непрозрачная подложка. Сплошной surface держится до линии под
+        //    вкладками, и ровно с этой линии начинается переход в прозрачность.
+        //    Так контент не «выпрыгивает» из-под вкладок, а плавно проявляется
+        //    в зоне размытия. Градиент считается в пикселях от низа шапки,
+        //    поэтому он не съезжает при разной высоте статус-бара.
         val headerSurface = MaterialTheme.colorScheme.surface
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to headerSurface,
-                        0.88f to headerSurface,
-                        1.0f to headerSurface.copy(alpha = 0f)
+                .drawBehind {
+                    if (size.height <= 0f) return@drawBehind
+                    val fadePx = HeaderFade.toPx().coerceAtMost(size.height)
+                    val solidEnd = (size.height - fadePx) / size.height
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0.0f to headerSurface,
+                            solidEnd to headerSurface,
+                            1.0f to headerSurface.copy(alpha = 0f)
+                        )
                     )
-                )
+                }
         )
 
         // 3. Содержимое шапки: отступаем от статус-бара, но фон и размытие
@@ -340,7 +356,7 @@ private fun HeaderBlock(
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = 20.dp)
-                .padding(top = 10.dp, bottom = 12.dp)
+                .padding(top = 10.dp, bottom = HeaderFade)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -358,7 +374,7 @@ private fun HeaderBlock(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "v1.1.1",
+                    text = "v1.1.2",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
