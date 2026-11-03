@@ -66,9 +66,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -90,15 +90,6 @@ import myxax.modrinth.client.data.ContentType
 import myxax.modrinth.client.data.ModHit
 import myxax.modrinth.client.data.ModVersion
 import java.util.Locale
-
-/**
- * Высота зоны перехода в прозрачность под вкладками.
- *
- * Она же служит нижним отступом шапки, поэтому градиент всегда начинается
- * ровно на линии под вкладками (`PrimaryTabRow` рисует там разделитель),
- * а не где-то ниже, как при расчёте «в процентах от высоты».
- */
-private val HeaderFade = 28.dp
 
 /**
  * Главный экран.
@@ -310,8 +301,13 @@ private fun HeaderBlock(
         modifier = Modifier
             .fillMaxWidth()
             .onSizeChanged { onHeightChanged(it.height) }
+            // Шапка — «матовое стекло»: размытие не должно вылезать за её края,
+            // иначе под вкладками появляется отдельная размытая полоса.
+            .clipToBounds()
     ) {
-        // 1. Размытая копия списка под шапкой.
+        // 1. Размытая копия списка. Рисуется ровно в габаритах шапки, поэтому
+        //    карточки, уехавшие под неё, видны только внутри шапки и только
+        //    размытыми — собственного градиента-перехода снизу больше нет.
         if (blurBackdrop) {
             Box(
                 modifier = Modifier
@@ -326,27 +322,13 @@ private fun HeaderBlock(
             }
         }
 
-        // 2. Непрозрачная подложка. Сплошной surface держится до линии под
-        //    вкладками, и ровно с этой линии начинается переход в прозрачность.
-        //    Так контент не «выпрыгивает» из-под вкладок, а плавно проявляется
-        //    в зоне размытия. Градиент считается в пикселях от низа шапки,
-        //    поэтому он не съезжает при разной высоте статус-бара.
-        val headerSurface = MaterialTheme.colorScheme.surface
+        // 2. Матовая подложка поверх размытия. Полупрозрачная, но граница
+        //    шапки резкая — список чёткий вплоть до вкладок и размывается
+        //    уже внутри шапки.
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .drawBehind {
-                    if (size.height <= 0f) return@drawBehind
-                    val fadePx = HeaderFade.toPx().coerceAtMost(size.height)
-                    val solidEnd = (size.height - fadePx) / size.height
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            0.0f to headerSurface,
-                            solidEnd to headerSurface,
-                            1.0f to headerSurface.copy(alpha = 0f)
-                        )
-                    )
-                }
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f))
         )
 
         // 3. Содержимое шапки: отступаем от статус-бара, но фон и размытие
@@ -356,7 +338,7 @@ private fun HeaderBlock(
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = 20.dp)
-                .padding(top = 10.dp, bottom = HeaderFade)
+                .padding(top = 10.dp, bottom = 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -374,7 +356,7 @@ private fun HeaderBlock(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "v1.1.2",
+                    text = "v1.1.3",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
