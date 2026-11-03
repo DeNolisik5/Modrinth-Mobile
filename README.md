@@ -77,4 +77,4 @@ Actions: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
 `KEYSTORE_PASSWORD` / `KEY_PASSWORD` в окружении. Если ключа нет, release
 соберётся неподписанным — это нормально для форков и pull request'ов.
 
-maked with DeepSeek-4.1-Flash
+*made with DeepSeek-4.1-Flash*
