@@ -28,8 +28,10 @@ sealed interface DownloadState {
 data class ModrinthUiState(
     val query: String = "",
     val tab: ContentType = ContentType.MOD,
-    val gameVersion: String? = null,
     val filters: SearchFilters = SearchFilters(),
+
+    /** Версии Minecraft из API Modrinth; до загрузки — запасной список. */
+    val availableVersions: List<String> = AppViewModel.GAME_VERSIONS,
 
     val results: List<ModHit> = emptyList(),
     val isLoading: Boolean = false,
@@ -64,6 +66,23 @@ class AppViewModel : ViewModel() {
 
     init {
         restartSearch()
+        loadGameVersions()
+    }
+
+    /** Тянем справочник версий Minecraft из API, чтобы не хардкодить его. */
+    private fun loadGameVersions() {
+        viewModelScope.launch {
+            try {
+                val list = ModrinthApi.gameVersions()
+                if (list.isNotEmpty()) {
+                    _state.update { it.copy(availableVersions = list) }
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                // Не критично: остаётся запасной список GAME_VERSIONS.
+            }
+        }
     }
 
     // ---------------------------------------------------------------- поиск
@@ -80,8 +99,9 @@ class AppViewModel : ViewModel() {
     }
 
     fun setGameVersion(version: String?) {
-        if (_state.value.gameVersion == version) return
-        _state.update { it.copy(gameVersion = version) }
+        val current = _state.value.filters
+        if (current.gameVersion == version) return
+        _state.update { it.copy(filters = current.copy(gameVersion = version)) }
         restartSearch()
     }
 
@@ -135,7 +155,6 @@ class AppViewModel : ViewModel() {
             val page = ModrinthApi.search(
                 query = snapshot.query,
                 type = snapshot.tab,
-                gameVersion = snapshot.gameVersion,
                 filters = snapshot.filters,
                 offset = offset
             )
@@ -253,15 +272,20 @@ class AppViewModel : ViewModel() {
     }
 
     companion object {
-        /** Быстрые фильтры по популярным версиям Minecraft. */
+        /**
+         * Запасной список версий Minecraft — показывается, пока справочник
+         * из API не загрузился (или если сети нет).
+         */
         val GAME_VERSIONS = listOf(
-            "1.21.8",
-            "1.21.1",
-            "1.20.6",
-            "1.20.1",
-            "1.19.2",
+            "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4",
+            "1.21.3", "1.21.2", "1.21.1", "1.21",
+            "1.20.6", "1.20.4", "1.20.1",
+            "1.19.4", "1.19.2",
             "1.18.2",
-            "1.16.5"
+            "1.17.1",
+            "1.16.5",
+            "1.15.2",
+            "1.12.2"
         )
     }
 }

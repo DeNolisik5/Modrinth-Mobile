@@ -42,15 +42,20 @@ enum class ModCategory(val apiValue: String, val label: String) {
 data class SearchFilters(
     val loaders: Set<ModLoader> = emptySet(),
     val categories: Set<ModCategory> = emptySet(),
-    val sort: SortOption = SortOption.RELEVANCE
+    val sort: SortOption = SortOption.RELEVANCE,
+    /** Версия Minecraft; null — любая. */
+    val gameVersion: String? = null
 ) {
     val isActive: Boolean
         get() = loaders.isNotEmpty() ||
             categories.isNotEmpty() ||
-            sort != SortOption.RELEVANCE
+            sort != SortOption.RELEVANCE ||
+            gameVersion != null
 
     val activeCount: Int
-        get() = loaders.size + categories.size + if (sort != SortOption.RELEVANCE) 1 else 0
+        get() = loaders.size + categories.size +
+            (if (sort != SortOption.RELEVANCE) 1 else 0) +
+            (if (gameVersion != null) 1 else 0)
 }
 
 /** Краткая карточка контента из результатов поиска. */

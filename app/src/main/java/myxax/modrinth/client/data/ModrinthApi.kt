@@ -23,7 +23,7 @@ object ModrinthApi {
     private const val BASE = "https://api.modrinth.com"
 
     private const val USER_AGENT =
-        "ModrinthClient/1.1.4 (github.com/DeNolisik5/Modrinth-Api-Mobile)"
+        "ModrinthClient/1.1.5 (github.com/DeNolisik5/Modrinth-Api-Mobile)"
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
@@ -36,7 +36,6 @@ object ModrinthApi {
     suspend fun search(
         query: String,
         type: ContentType,
-        gameVersion: String?,
         filters: SearchFilters,
         offset: Int,
         limit: Int = PAGE_SIZE
@@ -46,7 +45,7 @@ object ModrinthApi {
             .addQueryParameter("limit", limit.toString())
             .addQueryParameter("offset", offset.toString())
             .addQueryParameter("index", pickIndex(query, filters.sort))
-            .addQueryParameter("facets", buildFacets(type, gameVersion, filters))
+            .addQueryParameter("facets", buildFacets(type, filters))
             .build()
 
         val root = JSONObject(fetch(url.toString()))
@@ -83,7 +82,6 @@ object ModrinthApi {
      */
     private fun buildFacets(
         type: ContentType,
-        gameVersion: String?,
         filters: SearchFilters
     ): String {
         val groups = mutableListOf<String>()
@@ -98,6 +96,7 @@ object ModrinthApi {
             groups += filters.categories.joinToString(",", "[", "]") { "\"categories:${it.apiValue}\"" }
         }
 
+        val gameVersion = filters.gameVersion
         if (!gameVersion.isNullOrBlank()) {
             groups += "[\"versions:$gameVersion\"]"
         }
@@ -117,6 +116,24 @@ object ModrinthApi {
         categories = o.optJSONArray("categories").toStringList(),
         versions = o.optJSONArray("versions").toStringList()
     )
+
+    // ------------------------------------------------------ версии Minecraft
+
+    /**
+     * Справочник версий Minecraft (`/v2/tag/game_version`), только релизы и
+     * от новых к старым. Позволяет не хардкодить список версий в приложении.
+     */
+    suspend fun gameVersions(): List<String> = withContext(Dispatchers.IO) {
+        val arr = JSONArray(fetch("$BASE/v2/tag/game_version"))
+        val out = ArrayList<String>(arr.length())
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optString("version_type") != "release") continue
+            val version = o.optString("version")
+            if (version.isNotBlank()) out.add(version)
+        }
+        out
+    }
 
     // --------------------------------------------------------------- версии
 

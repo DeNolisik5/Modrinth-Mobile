@@ -65,3 +65,13 @@ git push origin v1.0.0    # дополнительно создаст GitHub Rel
 ## Стек
 
 Kotlin · Jetpack Compose · Material 3 Expressive · OkHttp · Coil · org.json
+
+## Подпись релиза
+
+Release-APK подписывается собственным ключом (`release.keystore`, PKCS12).
+Сам ключ и пароли в репозиторий не попадают — они лежат в секретах GitHub
+Actions: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
+
+Локальная сборка: положи `release.keystore` в корень проекта и задай
+`KEYSTORE_PASSWORD` / `KEY_PASSWORD` в окружении. Если ключа нет, release
+соберётся неподписанным — это нормально для форков и pull request'ов.

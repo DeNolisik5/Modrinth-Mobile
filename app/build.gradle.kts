@@ -6,6 +6,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// ---------------------------------------------------------------- подпись
+// Ключ ищется сначала по пути из окружения (CI), затем в корне проекта.
+// Пароли никогда не хранятся в репозитории — только в секретах GitHub.
+val releaseKeystore = file(
+    System.getenv("KEYSTORE_FILE") ?: "${rootProject.projectDir}/release.keystore"
+)
+val releaseStorePassword = System.getenv("KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("KEY_ALIAS") ?: "modrinthclient"
+val releaseKeyPassword = System.getenv("KEY_PASSWORD") ?: releaseStorePassword
+val hasReleaseKey = releaseKeystore.exists() && !releaseStorePassword.isNullOrBlank()
+
 android {
     namespace = "myxax.modrinth.client"
     compileSdk = 36
@@ -14,16 +25,32 @@ android {
         applicationId = "myxax.modrinth.client"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.1.4"
+        versionCode = 7
+        versionName = "1.1.5"
+    }
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = releaseKeystore
+                storeType = "PKCS12"
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
-            // Подписываем debug-ключом, чтобы APK ставился на телефон сразу после релиза.
-            signingConfig = signingConfigs.getByName("debug")
+            // Подпись настоящим релизным ключом. Ключ и пароли приходят из
+            // секретов GitHub Actions (см. .github/workflows/build.yml) либо
+            // лежат рядом с проектом при локальной сборке.
+            if (hasReleaseKey) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

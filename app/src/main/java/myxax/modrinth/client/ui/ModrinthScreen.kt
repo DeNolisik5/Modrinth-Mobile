@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -39,7 +38,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -207,13 +205,6 @@ fun ModrinthScreen(viewModel: AppViewModel) {
                     ),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    item(key = "game-versions") {
-                        GameVersionChips(
-                            selected = state.gameVersion,
-                            onSelect = viewModel::setGameVersion
-                        )
-                    }
-
                     when {
                         state.isLoading && state.results.isEmpty() -> item(key = "loading") {
                             CenteredBlock { CircularProgressIndicator() }
@@ -273,6 +264,7 @@ fun ModrinthScreen(viewModel: AppViewModel) {
     if (state.filtersOpen) {
         FiltersSheet(
             current = state.filters,
+            versions = state.availableVersions,
             onDismiss = viewModel::closeFilters,
             onApply = viewModel::applyFilters
         )
@@ -367,7 +359,7 @@ private fun HeaderBlock(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = "v1.1.4",
+                    text = "v1.1.5",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -442,29 +434,6 @@ private fun HeaderBlock(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun GameVersionChips(
-    selected: String?,
-    onSelect: (String?) -> Unit
-) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        item {
-            FilterChip(
-                selected = selected == null,
-                onClick = { onSelect(null) },
-                label = { Text("Все версии") }
-            )
-        }
-        items(AppViewModel.GAME_VERSIONS) { version ->
-            FilterChip(
-                selected = selected == version,
-                onClick = { onSelect(if (selected == version) null else version) },
-                label = { Text(version) }
-            )
         }
     }
 }

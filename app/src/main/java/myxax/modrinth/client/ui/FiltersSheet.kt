@@ -42,6 +42,7 @@ import myxax.modrinth.client.data.SortOption
 @Composable
 fun FiltersSheet(
     current: SearchFilters,
+    versions: List<String>,
     onDismiss: () -> Unit,
     onApply: (SearchFilters) -> Unit
 ) {
@@ -50,6 +51,7 @@ fun FiltersSheet(
     var loaders by remember { mutableStateOf(current.loaders) }
     var categories by remember { mutableStateOf(current.categories) }
     var sort by remember { mutableStateOf(current.sort) }
+    var gameVersion by remember { mutableStateOf(current.gameVersion) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -68,6 +70,25 @@ fun FiltersSheet(
                 text = "Фильтры",
                 style = MaterialTheme.typography.headlineMedium
             )
+
+            Spacer(Modifier.height(20.dp))
+            SectionTitle("Версия Minecraft")
+            ChipFlow {
+                FilterChip(
+                    selected = gameVersion == null,
+                    onClick = { gameVersion = null },
+                    label = { Text("Любая") }
+                )
+                versions.take(60).forEach { version ->
+                    FilterChip(
+                        selected = gameVersion == version,
+                        onClick = {
+                            gameVersion = if (gameVersion == version) null else version
+                        },
+                        label = { Text(version) }
+                    )
+                }
+            }
 
             Spacer(Modifier.height(20.dp))
             SectionTitle("Загрузчик")
@@ -124,6 +145,7 @@ fun FiltersSheet(
                         loaders = emptySet()
                         categories = emptySet()
                         sort = SortOption.RELEVANCE
+                        gameVersion = null
                     },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(20.dp)
@@ -137,7 +159,8 @@ fun FiltersSheet(
                             SearchFilters(
                                 loaders = loaders,
                                 categories = categories,
-                                sort = sort
+                                sort = sort,
+                                gameVersion = gameVersion
                             )
                         )
                     },
