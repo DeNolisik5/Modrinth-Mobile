@@ -13,10 +13,16 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.URLDecoder
 import java.util.concurrent.TimeUnit
 
 /**
- * Скачивает .jar мода в общую папку «Downloads» телефона.
+ * Скачивает файл проекта в общую папку «Downloads» телефона.
+ *
+ * Имя файла берётся из ответа API Modrinth (`files[].filename`), поэтому
+ * расширение всегда родное: `.jar` у модов, `.zip` у ресурспаков и шейдеров.
+ * MIME-тип подбирается по расширению — иначе MediaStore дописывает своё
+ * расширение и получается `my_pack.zip.jar`.
  *
  * На Android 10+ используется MediaStore, поэтому никаких разрешений
  * запрашивать не нужно. На более старых системах пишем напрямую в
@@ -25,9 +31,8 @@ import java.util.concurrent.TimeUnit
 object ModDownloader {
 
     private const val USER_AGENT =
-        "ModrinthClient/1.1.6.1 (github.com/DeNolisik5/Modrinth-Api-Mobile)"
+        "ModrinthClient/1.1.7 (github.com/DeNolisik5/Modrinth-Mobile)"
 
-    private const val MIME_JAR = "application/java-archive"
     private const val SUBFOLDER = "ModrinthClient"
 
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -35,7 +40,7 @@ object ModDownloader {
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    /** Возвращает путь вида «Downloads/ModrinthClient/файл.jar». */
+    /** Возвращает путь вида «Downloads/ModrinthClient/файл.zip». */
     suspend fun download(
         context: Context,
         version: ModVersion,
@@ -45,7 +50,7 @@ object ModDownloader {
             throw IOException("У этой версии нет файла для скачивания")
         }
 
-        val fileName = version.fileName.ifBlank { "mod.jar" }
+        val fileName = resolveFileName(version)
         val request = Request.Builder()
             .url(version.fileUrl)
             .header("User-Agent", USER_AGENT)
@@ -68,6 +73,40 @@ object ModDownloader {
         }
     }
 
+    // ------------------------------------------------------- имя и тип файла
+
+    /**
+     * Точное имя файла: сначала `filename` из API, иначе последний сегмент
+     * URL для скачивания. Символы, недопустимые в именах файлов, заменяются.
+     */
+    private fun resolveFileName(version: ModVersion): String {
+        val raw = version.fileName.ifBlank { fileNameFromUrl(version.fileUrl) }
+        val cleaned = raw
+            .substringAfterLast('/')
+            .substringAfterLast('\\')
+            .replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001F]"), "_")
+            .trim()
+        return cleaned.ifBlank { "modrinth-file" }
+    }
+
+    private fun fileNameFromUrl(url: String): String =
+        runCatching {
+            URLDecoder.decode(
+                url.substringBefore('?').substringBefore('#').substringAfterLast('/'),
+                "UTF-8"
+            )
+        }.getOrDefault("")
+
+    /** MIME по расширению: MediaStore не должен додумывать своё. */
+    private fun mimeTypeFor(fileName: String): String =
+        when (fileName.substringAfterLast('.', "").lowercase()) {
+            "jar", "litemod" -> "application/java-archive"
+            "zip", "mrpack" -> "application/zip"
+            "mcb" -> "application/octet-stream"
+            "json", "txt", "toml", "yaml", "yml" -> "text/plain"
+            else -> "application/octet-stream"
+        }
+
     // ------------------------------------------------------------- Android 10+
 
     private fun saveWithMediaStore(
@@ -80,7 +119,9 @@ object ModDownloader {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-            put(MediaStore.Downloads.MIME_TYPE, MIME_JAR)
+            // MIME строго по расширению: иначе MediaStore дописывает своё
+            // расширение и файл получает имя вида «pack.zip.jar».
+            put(MediaStore.Downloads.MIME_TYPE, mimeTypeFor(fileName))
             put(
                 MediaStore.Downloads.RELATIVE_PATH,
                 Environment.DIRECTORY_DOWNLOADS + "/" + SUBFOLDER
